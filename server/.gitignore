@@ -1,0 +1,15 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+storage/daily-evidence/*
+!storage/daily-evidence/.gitkeep
+storage/task-attachments/*
+!storage/task-attachments/.gitkeep
+storage/temp/*
+!storage/temp/.gitkeep
+storage/thumbnails/*
+!storage/thumbnails/.gitkeep
+storage/logs/*
+!storage/logs/.gitkeep

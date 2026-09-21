@@ -1,0 +1,59 @@
+# Dependencies
+node_modules
+server/node_modules
+
+# Build outputs
+dist
+dist-ssr
+server/dist
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+server/.env
+server/.env.*
+!server/.env.example
+*.local
+
+# Storage uploads & logs (preserve structure and default avatars)
+server/storage/daily-evidence/*
+!server/storage/daily-evidence/.gitkeep
+server/storage/task-attachments/*
+!server/storage/task-attachments/.gitkeep
+server/storage/temp/*
+!server/storage/temp/.gitkeep
+server/storage/thumbnails/*
+!server/storage/thumbnails/.gitkeep
+server/storage/logs/*
+!server/storage/logs/.gitkeep
+local-storage/
+
+# Logs & debugging
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor & OS files
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.antigravity
+.tools
+
+# Test reports & caches
+test-results
+playwright-report
+blob-report
+coverage
+.turbo
+.vite

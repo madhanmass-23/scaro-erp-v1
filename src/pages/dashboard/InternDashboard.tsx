@@ -1,0 +1,267 @@
+import React, { useEffect, useState } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { LoadingState } from '../../components/ui/LoadingState';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { StatusBadge } from '../../components/ui/StatusBadge';
+import { CheckSquare, Calendar, BookOpen, Clock, ArrowRight, Target, LogIn } from 'lucide-react';
+import { useAuth } from '../../features/auth/AuthContext';
+import { Link } from 'react-router-dom';
+import { extractTodayPlan } from '../../utils/dailyReport';
+import { meetingApi } from '../../services/api/meetingApi';
+import { attendanceApi } from '../../services/api/attendanceApi';
+import { dailyReportApi } from '../../services/api/dailyReportApi';
+import { taskApi } from '../../services/api/taskApi';
+
+interface InternDashboardData {
+  hasClockedIn: boolean;
+  hasSubmittedReport: boolean;
+  todayPlan: string | null;
+  pendingTasksCount: number;
+  upcomingMeetingsCount: number;
+  recentTasks: any[];
+}
+
+export const InternDashboard: React.FC = () => {
+  const { user, profile } = useAuth();
+  const [data, setData] = useState<InternDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+
+    async function fetchDashboardData() {
+      try {
+        setLoading(true);
+
+        // 1. Check Attendance for today
+        const attendanceSession = await attendanceApi.getCurrentSession();
+
+        // 2. Check Daily Report for today
+        const reportData = await dailyReportApi.getTodayReport();
+
+        // Extract today's morning plan strictly from notes or today_plan
+        const planText = extractTodayPlan(reportData?.notes) || reportData?.today_plan || null;
+
+        // 3. Fetch Tasks assigned to user
+        const allMyTasks = await taskApi.getTasks({ assignee_id: user!.id });
+        const pendingTasks = allMyTasks.filter(t => t.status !== 'Completed' && t.status !== 'Cancelled');
+        const recentTasks = pendingTasks.slice(0, 3);
+
+        // 4. Count Upcoming Meetings
+        let upcomingMeetings = 0;
+        try {
+          const userMeetings = await meetingApi.getMeetings();
+          upcomingMeetings = userMeetings.length;
+        } catch {
+          upcomingMeetings = 0;
+        }
+        
+        setData({
+          hasClockedIn: !!attendanceSession?.clock_in_time,
+          hasSubmittedReport: reportData?.status?.toLowerCase() === 'submitted',
+          todayPlan: planText,
+          pendingTasksCount: pendingTasks.length,
+          upcomingMeetingsCount: upcomingMeetings,
+          recentTasks: recentTasks.map(t => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            due_date: t.due_date,
+          }))
+        });
+
+      } catch (err: any) {
+        setError(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchDashboardData();
+  }, [user]);
+
+  if (loading) return <LoadingState text="Loading training workspace..." />;
+  if (error) return <ErrorState title="Failed to load dashboard" message={error.message} onRetry={() => window.location.reload()} />;
+
+  const firstName = profile?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Intern';
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border pb-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-content tracking-tight">Intern Training Hub: {firstName}</h1>
+          <p className="text-xs sm:text-sm text-content-muted mt-0.5">Track learning milestones, daily reports, and assigned project tasks.</p>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="text-xs font-semibold text-primary uppercase tracking-wider">
+            {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+          </p>
+        </div>
+      </div>
+
+      {/* Today's Focus & Plan Banner */}
+      {data?.todayPlan && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0 mt-0.5">
+                  <Target className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-primary">Today's Focus & Plan</h2>
+                  <p className="text-sm font-medium text-content mt-1 leading-relaxed whitespace-pre-wrap">
+                    {data.todayPlan}
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/app/tracker"
+                className="text-xs font-medium text-primary hover:text-primary-hover shrink-0 underline"
+              >
+                Open Tracker
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Status Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-center">
+              <div className={`p-2.5 rounded-lg shrink-0 ${data?.hasClockedIn ? 'bg-status-success/10 text-status-success' : 'bg-status-warning/10 text-status-warning'}`}>
+                <Clock className="h-5 w-5" />
+              </div>
+              <div className="ml-3.5 min-w-0">
+                <p className="text-xs font-medium text-content-muted uppercase tracking-wider">Attendance</p>
+                <p className="text-base font-bold text-content truncate mt-0.5">
+                  {data?.hasClockedIn ? 'Clocked In' : 'Not Clocked In'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-center">
+              <div className={`p-2.5 rounded-lg shrink-0 ${data?.hasSubmittedReport ? 'bg-status-success/10 text-status-success' : 'bg-primary/10 text-primary'}`}>
+                <BookOpen className="h-5 w-5" />
+              </div>
+              <div className="ml-3.5 min-w-0">
+                <p className="text-xs font-medium text-content-muted uppercase tracking-wider">Learning Report</p>
+                <p className="text-base font-bold text-content truncate mt-0.5">
+                  {data?.hasSubmittedReport ? 'Submitted' : 'In Progress'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-center">
+              <div className="p-2.5 bg-primary/10 text-primary rounded-lg shrink-0">
+                <CheckSquare className="h-5 w-5" />
+              </div>
+              <div className="ml-3.5 min-w-0">
+                <p className="text-xs font-medium text-content-muted uppercase tracking-wider">Training Tasks</p>
+                <p className="text-base font-bold text-content truncate mt-0.5">{data?.pendingTasksCount} Pending</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-center">
+              <div className="p-2.5 bg-status-info/10 text-status-info rounded-lg shrink-0">
+                <Calendar className="h-5 w-5" />
+              </div>
+              <div className="ml-3.5 min-w-0">
+                <p className="text-xs font-medium text-content-muted uppercase tracking-wider">Sync Meetings</p>
+                <p className="text-base font-bold text-content truncate mt-0.5">{data?.upcomingMeetingsCount} Today</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Action Areas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border">
+            <CardTitle className="text-base font-semibold">Assigned Tasks</CardTitle>
+            <Link to="/app/tasks" className="text-xs text-primary hover:text-primary-hover font-medium flex items-center">
+              View All <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Link>
+          </CardHeader>
+          <CardContent className="flex-1 p-4 sm:p-5">
+            {data?.recentTasks && data.recentTasks.length > 0 ? (
+              <div className="space-y-3">
+                {data.recentTasks.map(task => (
+                  <div key={task.id} className="flex justify-between items-center p-3 border border-border rounded-lg hover:bg-surface-muted transition-colors">
+                    <div>
+                      <p className="font-medium text-content text-sm">{task.title}</p>
+                      <p className="text-xs text-content-muted mt-0.5">Due: {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'Flexible'}</p>
+                    </div>
+                    <StatusBadge status={task.status} size="sm" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <CheckSquare className="h-8 w-8 text-content-muted mx-auto mb-2 opacity-50" />
+                <p className="text-content-muted text-xs">No pending training tasks right now.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="flex flex-col">
+          <CardHeader className="pb-3 border-b border-border">
+            <CardTitle className="text-base font-semibold">Daily Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1 p-4 sm:p-5 flex flex-col gap-3">
+             {!data?.hasClockedIn && (
+               <Link to="/app/attendance" className="flex items-center p-3.5 border border-border rounded-lg hover:border-primary hover:bg-primary/5 transition-all group">
+                 <div className="bg-primary/10 p-2.5 rounded-full text-primary mr-3.5 group-hover:bg-primary group-hover:text-white transition-colors">
+                   <LogIn className="h-4 w-4" />
+                 </div>
+                 <div>
+                   <p className="font-medium text-sm text-content">Clock In</p>
+                   <p className="text-xs text-content-muted">Record your training hours today</p>
+                 </div>
+               </Link>
+             )}
+             
+             {!data?.hasSubmittedReport && (
+               <Link to="/app/tracker" className="flex items-center p-3.5 border border-border rounded-lg hover:border-primary hover:bg-primary/5 transition-all group">
+                 <div className="bg-primary/10 p-2.5 rounded-full text-primary mr-3.5 group-hover:bg-primary group-hover:text-white transition-colors">
+                   <BookOpen className="h-4 w-4" />
+                 </div>
+                 <div>
+                   <p className="font-medium text-sm text-content">Daily Work & Learning Tracker</p>
+                   <p className="text-xs text-content-muted">Log what you completed and learned today</p>
+                 </div>
+               </Link>
+             )}
+
+             <Link to="/app/meetings" className="flex items-center p-3.5 border border-border rounded-lg hover:border-primary hover:bg-primary/5 transition-all group">
+               <div className="bg-surface-muted p-2.5 rounded-full text-content-muted mr-3.5 group-hover:bg-primary group-hover:text-white transition-colors">
+                 <Calendar className="h-4 w-4" />
+               </div>
+               <div>
+                 <p className="font-medium text-sm text-content">Sync Meetings</p>
+                 <p className="text-xs text-content-muted">View upcoming mentor & team calls</p>
+               </div>
+             </Link>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
