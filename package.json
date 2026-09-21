@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "description": "SCARO ERP — Modern Enterprise Resource Planning Platform",
   "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "npm run build:client && npm run build:server",
