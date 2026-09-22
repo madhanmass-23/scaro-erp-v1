@@ -35,7 +35,7 @@ export const MobileBottomNav: React.FC = () => {
 
   const isSupervisor = role === 'Super Admin' || role === 'Admin';
   const trackerHref = isSupervisor ? '/app/reports' : '/app/tracker';
-  const trackerLabel = isSupervisor ? 'Reports' : 'Daily Report';
+  const trackerLabel = isSupervisor ? 'Reports' : 'Daily Summary';
 
   const handleLogout = async () => {
     setIsMoreOpen(false);

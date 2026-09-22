@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Download } from 'lucide-react';
 import { useAuth } from '../../features/auth/AuthContext';
+import { usePwaInstall } from '../../components/pwa/usePwaInstall';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 
@@ -11,8 +12,10 @@ export const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [downloadHint, setDownloadHint] = useState<string | null>(null);
   
   const { user, role, loading: authLoading, error: authError, signIn } = useAuth();
+  const { isInstalled, isStandalone, deferredPrompt, promptInstall } = usePwaInstall();
   const navigate = useNavigate();
   const location = useLocation();
   const logoutSuccessMessage = (location.state as any)?.logoutSuccessMessage || (location.state as any)?.message;
@@ -61,6 +64,18 @@ export const Login: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  const handleDownloadPwa = async () => {
+    if (deferredPrompt) {
+      await promptInstall();
+    } else {
+      // Graceful fallback for browsers without native beforeinstallprompt (e.g. desktop safari/firefox)
+      setDownloadHint('Use your browser menu (e.g. "Install app" or "Add to Home screen") to install.');
+      setTimeout(() => setDownloadHint(null), 5000);
+    }
+  };
+
+  const showDownloadButton = !isInstalled && !isStandalone;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface-muted p-4">
@@ -142,6 +157,26 @@ export const Login: React.FC = () => {
             {(isLoading || authLoading) ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>
+
+        {showDownloadButton && (
+          <div className="mt-6 pt-4 border-t border-border flex flex-col items-center">
+            <button
+              id="pwa-download-button"
+              data-testid="pwa-download-button"
+              type="button"
+              onClick={handleDownloadPwa}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-content hover:text-primary bg-surface-muted hover:bg-primary/5 border border-border hover:border-primary/30 transition-all cursor-pointer shadow-2xs"
+            >
+              <Download className="h-3.5 w-3.5 text-primary" />
+              <span>Download SCARO ERP</span>
+            </button>
+            {downloadHint && (
+              <p className="text-[11px] text-content-muted mt-2 text-center">
+                {downloadHint}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

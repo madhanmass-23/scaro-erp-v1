@@ -15,6 +15,7 @@ import {
   Megaphone,
   ExternalLink,
   RefreshCw,
+  Settings,
 } from 'lucide-react';
 import { useAuth } from '../../features/auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -27,6 +28,7 @@ import {
   getNotificationDestination,
   triggerDailyReportReminder,
 } from '../../services/notificationService';
+import { NotificationSettingsModal } from '../../components/notifications/NotificationSettingsModal';
 
 export const NotificationsPage: React.FC = () => {
   const { user } = useAuth();
@@ -35,6 +37,14 @@ export const NotificationsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [activeCategory, setActiveCategory] = useState<NotificationCategory>('all');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [permissionBannerDismissed, setPermissionBannerDismissed] = useState(false);
+
+  const isBrowserNotificationDefault =
+    typeof window !== 'undefined' &&
+    'Notification' in window &&
+    Notification.permission === 'default' &&
+    !permissionBannerDismissed;
 
   const loadNotifications = async (isBackground = false) => {
     if (!user) return;
@@ -238,6 +248,15 @@ export const NotificationsPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Button
+            id="notification-settings-btn"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsSettingsOpen(true)}
+            className="gap-1.5 text-xs font-medium cursor-pointer"
+          >
+            <Settings className="h-3.5 w-3.5" /> Settings
+          </Button>
           <Button variant="outline" size="sm" onClick={() => loadNotifications(false)} className="gap-1.5 text-xs">
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
           </Button>
@@ -248,6 +267,50 @@ export const NotificationsPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Optional Non-Intrusive Permission Prompt Banner */}
+      {isBrowserNotificationDefault && (
+        <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0">
+              <Bell className="h-5 w-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-content">Enable Browser Notifications</h4>
+              <p className="text-xs text-content-muted">
+                Receive instant meeting reminders 5 minutes before scheduled start time and task updates.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPermissionBannerDismissed(true)}
+              className="text-xs"
+            >
+              Not now
+            </Button>
+            <Button
+              id="enable-notifications-banner-btn"
+              variant="primary"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const res = await Notification.requestPermission();
+                  if (res === 'granted') {
+                    loadNotifications(false);
+                  }
+                } catch {}
+                setPermissionBannerDismissed(true);
+              }}
+              className="text-xs gap-1.5 font-semibold"
+            >
+              <Bell className="h-3.5 w-3.5" /> Enable
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs border-b border-border">
@@ -280,12 +343,22 @@ export const NotificationsPage: React.FC = () => {
       {loading && notifications.length === 0 ? (
         <LoadingState text="Loading notifications..." />
       ) : error ? (
-        <ErrorState title="Failed to load notifications" message={error.message} onRetry={loadNotifications} />
+        <ErrorState
+          title="Failed to load notifications"
+          message={error.message}
+          onRetry={() => loadNotifications(false)}
+        />
       ) : filteredNotifications.length === 0 ? (
-        <Card className="p-12 text-center text-content-muted border border-border">
-          <Bell className="h-12 w-12 mx-auto mb-3 opacity-20 text-content" />
-          <p className="text-base font-semibold text-content">All caught up!</p>
-          <p className="text-xs text-content-muted mt-1">You have no notifications in this view.</p>
+        <Card className="p-12 text-center text-content-muted space-y-3">
+          <Bell className="h-10 w-10 mx-auto text-content-muted/40" />
+          <div>
+            <h3 className="text-sm font-semibold text-content">No notifications found</h3>
+            <p className="text-xs text-content-muted mt-0.5">
+              {activeCategory === 'all'
+                ? "You're all caught up! No notifications to display."
+                : `No ${activeCategory} notifications found.`}
+            </p>
+          </div>
         </Card>
       ) : (
         <div className="space-y-6">
@@ -314,6 +387,13 @@ export const NotificationsPage: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Notification Settings Modal */}
+      <NotificationSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onPreferencesUpdated={() => loadNotifications(false)}
+      />
     </div>
   );
 };

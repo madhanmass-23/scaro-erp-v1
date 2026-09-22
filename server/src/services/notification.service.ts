@@ -121,6 +121,84 @@ export class NotificationService {
     const updatedCount = await notificationRepository.markAllAsRead(callerAuth.userId);
     return { updated_count: updatedCount };
   }
+
+  /**
+   * Retrieves notification preferences for the authenticated user (IDOR safe).
+   */
+  async getPreferences(callerAuth: UserRoleInfo) {
+    return notificationRepository.getUserPreferences(callerAuth.userId);
+  }
+
+  /**
+   * Updates notification preferences for the authenticated user (IDOR safe).
+   */
+  async updatePreferences(callerAuth: UserRoleInfo, prefs: any) {
+    return notificationRepository.updateUserPreferences(callerAuth.userId, prefs);
+  }
+
+  /**
+   * Scans upcoming active meetings (starting within ~5 minutes) and dispatches reminders to participants.
+   * Deduplicates: Each participant receives at most 1 reminder notification per meeting.
+   * Respects preference: Only participants with meetings_enabled=true and in_app_enabled=true receive notifications.
+   */
+  async checkUpcomingMeetingReminders(windowMinutes = 6): Promise<{ dispatchedCount: number }> {
+    let dispatchedCount = 0;
+    try {
+      const meetings = await notificationRepository.getUpcomingActiveMeetings(windowMinutes);
+      for (const meeting of meetings) {
+        const participantIds = await notificationRepository.getMeetingParticipantUserIds(meeting.id);
+        for (const userId of participantIds) {
+          // Check preferences
+          const prefs = await notificationRepository.getUserPreferences(userId);
+          if (!prefs.meetings_enabled || !prefs.in_app_enabled) {
+            continue;
+          }
+
+          // Check deduplication
+          const alreadyReminded = await notificationRepository.findDuplicateMeetingReminder(userId, meeting.id);
+          if (alreadyReminded) {
+            continue;
+          }
+
+          // Dispatch reminder notification
+          await notificationRepository.createNotification({
+            user_id: userId,
+            type: "meeting_reminder",
+            title: "Meeting starts in 5 minutes",
+            message: `Meeting '${meeting.title}' is scheduled to start at ${meeting.start_time}.`,
+            reference_id: meeting.id,
+            reference_type: "meeting",
+          });
+          dispatchedCount++;
+        }
+      }
+    } catch (err) {
+      console.error("[NOTIFICATION] Error checking upcoming meeting reminders:", err);
+    }
+    return { dispatchedCount };
+  }
+
+  /**
+   * Saves Web Push subscription for the authenticated user.
+   */
+  async subscribePush(callerAuth: UserRoleInfo, subscription: any): Promise<{ success: boolean }> {
+    if (!subscription || !subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) {
+      throw new AppError("Invalid push subscription object.", 400, "INVALID_PUSH_SUBSCRIPTION");
+    }
+    await notificationRepository.savePushSubscription(callerAuth.userId, subscription);
+    return { success: true };
+  }
+
+  /**
+   * Removes Web Push subscription for the authenticated user.
+   */
+  async unsubscribePush(callerAuth: UserRoleInfo, endpoint: string): Promise<{ success: boolean }> {
+    if (!endpoint || typeof endpoint !== "string") {
+      throw new AppError("Invalid endpoint for push unsubscription.", 400, "INVALID_ENDPOINT");
+    }
+    await notificationRepository.removePushSubscription(callerAuth.userId, endpoint);
+    return { success: true };
+  }
 }
 
 export const notificationService = new NotificationService();

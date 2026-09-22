@@ -3,9 +3,12 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { MobileBottomNav } from '../components/ui/MobileBottomNav';
-import { AutoInstallPrompt } from '../components/pwa/AutoInstallPrompt';
+import { useMeetingReminders } from '../hooks/useMeetingReminders';
 
 export const AppLayout: React.FC = () => {
+  // Activate client-side 5-minute meeting reminder watcher for active sessions
+  useMeetingReminders();
+
   return (
     <div className="flex h-screen bg-surface-muted overflow-hidden">
       {/* Persistent Desktop Sidebar (hidden on <1024px) */}
@@ -24,9 +27,6 @@ export const AppLayout: React.FC = () => {
 
         {/* Mobile & Tablet Bottom Navigation (<1024px) */}
         <MobileBottomNav />
-
-        {/* Automatic Post-Login PWA Install Prompt */}
-        <AutoInstallPrompt />
       </div>
     </div>
   );

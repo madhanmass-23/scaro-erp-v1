@@ -36,7 +36,7 @@ const NAVIGATION: NavSection[] = [
       { name: 'Work Time Tracking', href: '/app/attendance', icon: Calendar },
       { name: 'Meetings', href: '/app/meetings', icon: Users },
       { name: 'Leave', href: '/app/leave', icon: Calendar },
-      { name: 'Daily Report', href: '/app/tracker', icon: FileText, roles: ['Employee', 'Intern'] },
+      { name: 'Daily Summary', href: '/app/tracker', icon: FileText, roles: ['Employee', 'Intern'] },
       { name: 'Reports', href: '/app/reports', icon: FileText, roles: ['Super Admin', 'Admin'] },
     ],
   },

@@ -33,10 +33,10 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only cache GET requests and skip backend API requests
+  // Only cache GET requests and skip Supabase API / auth requests
   if (
     event.request.method !== 'GET' ||
-    event.request.url.includes('/api/') ||
+    event.request.url.includes('supabase.co') ||
     event.request.url.includes('chrome-extension')
   ) {
     return;
@@ -56,3 +56,49 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// Web Push Notification Event Handler
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  try {
+    const payload = event.data.json();
+    const title = payload.title || 'SCARO ERP';
+    const options = {
+      body: payload.body || payload.message || '',
+      icon: payload.icon || '/favicon.svg',
+      badge: '/favicon.svg',
+      data: payload.data || { url: '/app/notifications' },
+      tag: payload.tag || 'scaro-notification',
+      renotify: true,
+    };
+    event.waitUntil(self.registration.showNotification(title, options));
+  } catch (err) {
+    const text = event.data.text();
+    event.waitUntil(
+      self.registration.showNotification('SCARO ERP', {
+        body: text,
+        icon: '/favicon.svg',
+        data: { url: '/app/notifications' },
+      })
+    );
+  }
+});
+
+// Notification Click Event Handler
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const urlToOpen = event.notification.data?.url || '/app/notifications';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.includes(urlToOpen) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
+});
+

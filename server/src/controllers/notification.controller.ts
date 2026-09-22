@@ -100,6 +100,74 @@ export class NotificationController {
       next(err);
     }
   };
+
+  /**
+   * GET /api/v1/notifications/preferences
+   */
+  getPreferences = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const auth = await this.getAuthContext(req);
+      const prefs = await notificationService.getPreferences(auth);
+      sendSuccess(res, prefs);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * PUT /api/v1/notifications/preferences
+   */
+  updatePreferences = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const auth = await this.getAuthContext(req);
+      // Strip any attempted user_id from req.body to enforce IDOR protection
+      const { user_id, ...safePrefs } = req.body || {};
+      const updated = await notificationService.updatePreferences(auth, safePrefs);
+      sendSuccess(res, updated);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * POST /api/v1/notifications/reminders/check
+   */
+  triggerMeetingReminders = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await this.getAuthContext(req);
+      const windowMinutes = req.body?.windowMinutes ? Number(req.body.windowMinutes) : 6;
+      const result = await notificationService.checkUpcomingMeetingReminders(windowMinutes);
+      sendSuccess(res, result);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * POST /api/v1/notifications/push-subscribe
+   */
+  subscribePush = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const auth = await this.getAuthContext(req);
+      const result = await notificationService.subscribePush(auth, req.body?.subscription);
+      sendSuccess(res, result);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * POST /api/v1/notifications/push-unsubscribe
+   */
+  unsubscribePush = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const auth = await this.getAuthContext(req);
+      const result = await notificationService.unsubscribePush(auth, req.body?.endpoint);
+      sendSuccess(res, result);
+    } catch (err) {
+      next(err);
+    }
+  };
 }
 
 export const notificationController = new NotificationController();

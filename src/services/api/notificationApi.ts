@@ -81,4 +81,58 @@ export const notificationApi = {
   async markAllAsRead(): Promise<{ updated_count: number }> {
     return api.patch<{ updated_count: number }>('/notifications/read-all');
   },
+
+  /**
+   * Gets notification preferences for the authenticated user.
+   * Calls GET /api/v1/notifications/preferences
+   */
+  async getUserPreferences(): Promise<UserNotificationPreferences> {
+    return api.get<UserNotificationPreferences>('/notifications/preferences');
+  },
+
+  /**
+   * Updates notification preferences for the authenticated user.
+   * Calls PUT /api/v1/notifications/preferences
+   */
+  async updateUserPreferences(prefs: Partial<UserNotificationPreferences>): Promise<UserNotificationPreferences> {
+    return api.put<UserNotificationPreferences>('/notifications/preferences', prefs);
+  },
+
+  /**
+   * Triggers upcoming meeting reminder check.
+   * Calls POST /api/v1/notifications/reminders/check
+   */
+  async triggerMeetingRemindersCheck(windowMinutes = 6): Promise<{ dispatchedCount: number }> {
+    return api.post<{ dispatchedCount: number }>('/notifications/reminders/check', { windowMinutes });
+  },
+
+  /**
+   * Registers a Web Push subscription.
+   * Calls POST /api/v1/notifications/push-subscribe
+   */
+  async subscribePush(subscription: any): Promise<{ success: boolean }> {
+    return api.post<{ success: boolean }>('/notifications/push-subscribe', { subscription });
+  },
+
+  /**
+   * Removes a Web Push subscription.
+   * Calls POST /api/v1/notifications/push-unsubscribe
+   */
+  async unsubscribePush(endpoint: string): Promise<{ success: boolean }> {
+    return api.post<{ success: boolean }>('/notifications/push-unsubscribe', { endpoint });
+  },
 };
+
+export interface UserNotificationPreferences {
+  user_id: string;
+  meetings_enabled: boolean;
+  tasks_enabled: boolean;
+  leave_enabled: boolean;
+  messages_enabled: boolean;
+  announcements_enabled: boolean;
+  daily_reports_enabled: boolean;
+  browser_enabled: boolean;
+  in_app_enabled: boolean;
+  updated_at?: string;
+}
+
