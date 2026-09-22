@@ -7,6 +7,7 @@ import {
   MeetingPaginationOptions,
 } from "../repositories/meeting.repository.js";
 import { userRepository } from "../repositories/user.repository.js";
+import { notificationRepository } from "../repositories/notification.repository.js";
 import { auditRepository } from "../repositories/audit.repository.js";
 import { authorizationService } from "./authorization.service.js";
 import { UserRoleInfo, rbacService } from "./rbac.service.js";
@@ -302,6 +303,26 @@ export class MeetingService {
         end_time: created.end_time,
       },
     });
+
+    // Notify participants
+    if (validParticipantIds.length > 0) {
+      try {
+        for (const pId of validParticipantIds) {
+          if (pId !== callerAuth.userId) {
+            await notificationRepository.createNotification({
+              user_id: pId,
+              type: "meeting_scheduled",
+              title: "Meeting Invitation",
+              message: `You are invited to "${created.title}" on ${created.meeting_date} at ${created.start_time}.`,
+              reference_id: created.id,
+              reference_type: "meeting",
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("[NOTIFICATION] Could not dispatch meeting notifications to participants:", err);
+      }
+    }
 
     return this.formatMeeting(created);
   }

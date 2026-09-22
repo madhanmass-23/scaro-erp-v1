@@ -159,6 +159,30 @@ export class NotificationRepository {
     }
     return created;
   }
+
+  /**
+   * Creates notifications for multiple recipients in bulk.
+   */
+  async createBulkNotifications(
+    notifications: Array<{
+      id?: string;
+      user_id: string;
+      type: string;
+      title: string;
+      message: string;
+      reference_id?: string | null;
+      reference_type?: string | null;
+    }>
+  ): Promise<void> {
+    if (!notifications || notifications.length === 0) return;
+    for (const n of notifications) {
+      try {
+        await this.createNotification(n);
+      } catch (err) {
+        console.warn("[NOTIFICATION] Failed to deliver bulk notification:", err);
+      }
+    }
+  }
 }
 
 export const notificationRepository = new NotificationRepository();

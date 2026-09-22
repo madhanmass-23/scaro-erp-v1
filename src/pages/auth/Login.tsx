@@ -4,7 +4,6 @@ import { CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../features/auth/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { InstallAppButton } from '../../components/pwa/InstallAppButton';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -143,13 +142,6 @@ export const Login: React.FC = () => {
             {(isLoading || authLoading) ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>
-
-        <div className="mt-6 pt-5 border-t border-border flex flex-col items-center justify-center gap-2">
-          <span className="text-[11px] font-medium text-content-muted uppercase tracking-wider">
-            Mobile & Desktop Access
-          </span>
-          <InstallAppButton className="w-full" />
-        </div>
       </div>
     </div>
   );

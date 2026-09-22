@@ -5,15 +5,10 @@ import { LayoutDashboard, CheckSquare, Briefcase, Calendar, Users, FileText, Mes
 import { useAuth } from '../features/auth/AuthContext';
 import { InstallAppButton } from '../components/pwa/InstallAppButton';
 
-interface SidebarProps {
-  isMobileOpen: boolean;
-  onMobileClose: () => void;
-}
-
 interface NavItem {
   name: string;
   href: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   roles?: string[]; // If undefined, available to all roles
 }
 
@@ -56,97 +51,86 @@ const NAVIGATION: NavSection[] = [
   {
     title: 'Administration',
     items: [
-      { name: 'Profile', href: '/app/profile', icon: UserIcon },
+      { name: 'Profile & Security', href: '/app/profile', icon: UserIcon },
       { name: 'Audit Logs', href: '/app/audit-logs', icon: Shield, roles: ['Super Admin'] },
       { name: 'Company Settings', href: '/app/admin/settings', icon: Shield, roles: ['Super Admin'] },
     ],
   }
 ];
 
-export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose }) => {
+export const Sidebar: React.FC = () => {
   const { user, profile, role } = useAuth();
 
   return (
-    <>
-      {/* Mobile Backdrop */}
-      {isMobileOpen && (
-        <div 
-          className="fixed inset-0 bg-content/50 z-40 lg:hidden"
-          onClick={onMobileClose}
+    <aside className="hidden lg:flex lg:flex-col w-64 bg-surface border-r border-border shrink-0 select-none">
+      {/* Brand Header */}
+      <div className="p-5 border-b border-border flex items-center gap-3">
+        <img
+          src="/assets/scaro-logo.png"
+          alt="SCARO Logo"
+          className="h-9 w-9 object-contain rounded-lg border border-border/50 bg-[#fbf7f2] shadow-xs shrink-0"
         />
-      )}
-
-      {/* Sidebar Container */}
-      <aside className={cn(
-        "fixed lg:static inset-y-0 left-0 z-50 w-64 bg-surface border-r border-border flex flex-col transition-transform duration-200 ease-in-out lg:transform-none",
-        isMobileOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <div className="p-5 border-b border-border flex items-center gap-3">
-          <img
-            src="/assets/scaro-logo.png"
-            alt="SCARO Logo"
-            className="h-9 w-9 object-contain rounded-lg border border-border/50 bg-[#fbf7f2] shadow-xs shrink-0"
-          />
-          <div>
-            <h2 className="text-xl font-bold text-primary leading-tight">SCARO</h2>
-            <p className="text-[10px] text-content-muted uppercase tracking-wider font-semibold">Enterprise ERP</p>
-          </div>
+        <div>
+          <h2 className="text-xl font-bold text-primary leading-tight">SCARO</h2>
+          <p className="text-[10px] text-content-muted uppercase tracking-wider font-semibold">Enterprise ERP</p>
         </div>
+      </div>
 
-        <nav className="flex-1 overflow-y-auto p-4 space-y-8">
-          {NAVIGATION.map((section) => {
-            const filteredItems = section.items.filter(item => !item.roles || (role && item.roles.includes(role)));
-            
-            if (filteredItems.length === 0) return null;
+      {/* Navigation Sections */}
+      <nav className="flex-1 overflow-y-auto p-4 space-y-6">
+        {NAVIGATION.map((section) => {
+          const filteredItems = section.items.filter(item => !item.roles || (role && item.roles.includes(role)));
 
-            return (
-              <div key={section.title}>
-                <h3 className="px-3 text-xs font-semibold text-content-muted uppercase tracking-wider mb-2">
-                  {section.title}
-                </h3>
-                <div className="space-y-1">
-                  {filteredItems.map((item) => (
-                    <NavLink
-                      key={item.name}
-                      to={item.href}
-                      onClick={onMobileClose}
-                      className={({ isActive }) => cn(
-                        "flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                        isActive 
-                          ? "bg-primary/10 text-primary" 
-                          : "text-content hover:bg-surface-muted"
-                      )}
-                    >
-                      <item.icon className="mr-3 h-5 w-5" />
-                      {item.name}
-                    </NavLink>
-                  ))}
-                </div>
+          if (filteredItems.length === 0) return null;
+
+          return (
+            <div key={section.title}>
+              <h3 className="px-3 text-[11px] font-semibold text-content-muted uppercase tracking-wider mb-2">
+                {section.title}
+              </h3>
+              <div className="space-y-1">
+                {filteredItems.map((item) => (
+                  <NavLink
+                    key={item.name}
+                    to={item.href}
+                    className={({ isActive }) => cn(
+                      "flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "text-content hover:bg-surface-muted"
+                    )}
+                  >
+                    <item.icon className="mr-3 h-4 w-4 shrink-0" />
+                    <span>{item.name}</span>
+                  </NavLink>
+                ))}
               </div>
-            );
-          })}
-        </nav>
+            </div>
+          );
+        })}
+      </nav>
 
-        <div className="px-4 py-2 border-t border-border">
-          <InstallAppButton className="w-full" />
-        </div>
+      {/* PWA Install Button (If Applicable) */}
+      <div className="px-4 py-2 border-t border-border">
+        <InstallAppButton className="w-full" />
+      </div>
 
-        <div className="p-4 border-t border-border flex items-center">
-          <div className="flex-shrink-0">
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt={profile.full_name} className="h-8 w-8 rounded-full object-cover border border-border" />
-            ) : (
-              <span className="inline-block h-8 w-8 rounded-full bg-surface-muted flex items-center justify-center text-primary font-bold">
-                {profile?.display_name ? profile.display_name.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase()}
-              </span>
-            )}
-          </div>
-          <div className="ml-3 truncate">
-            <p className="text-sm font-medium text-content truncate">{profile?.display_name || user?.email}</p>
-            <p className="text-xs font-medium text-content-muted truncate">{role || 'No Role'}</p>
-          </div>
+      {/* User Info Footer */}
+      <div className="p-4 border-t border-border flex items-center">
+        <div className="flex-shrink-0">
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} alt={profile.full_name} className="h-8 w-8 rounded-full object-cover border border-border" />
+          ) : (
+            <span className="inline-block h-8 w-8 rounded-full bg-surface-muted flex items-center justify-center text-primary font-bold">
+              {profile?.display_name ? profile.display_name.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase()}
+            </span>
+          )}
         </div>
-      </aside>
-    </>
+        <div className="ml-3 truncate">
+          <p className="text-sm font-medium text-content truncate">{profile?.display_name || user?.email}</p>
+          <p className="text-xs font-medium text-content-muted truncate">{role || 'Team Member'}</p>
+        </div>
+      </div>
+    </aside>
   );
 };

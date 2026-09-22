@@ -71,11 +71,11 @@ export function getNotificationDestination(n: NotificationItem): string {
     return n.reference_id ? `/app/meetings?meetingId=${n.reference_id}` : '/app/meetings';
   }
 
-  if (refType === 'daily_report' || type.startsWith('report')) {
-    if (type === 'report_submitted' && n.reference_id) {
+  if (refType === 'daily_report' || type.startsWith('daily_report') || type.startsWith('report')) {
+    if (n.reference_id) {
       return `/app/reports?reportId=${n.reference_id}`;
     }
-    return '/app/tracker';
+    return '/app/reports';
   }
 
   if (refType === 'leave' || type.startsWith('leave')) {
@@ -83,7 +83,7 @@ export function getNotificationDestination(n: NotificationItem): string {
   }
 
   if (refType === 'announcement' || type === 'announcement') {
-    return '/app/dashboard';
+    return '/app/announcements';
   }
 
   return '/app/dashboard';

@@ -13,10 +13,24 @@ import apiRouter from "./routes/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "../..");
-const clientDistPath = process.env.CLIENT_DIST_PATH
-  ? path.resolve(process.env.CLIENT_DIST_PATH)
-  : path.resolve(projectRoot, "dist");
+function resolveClientDistPath(): string | null {
+  const candidates = [
+    process.env.CLIENT_DIST_PATH ? path.resolve(process.env.CLIENT_DIST_PATH) : null,
+    path.resolve(__dirname, "../../dist"),
+    path.resolve(__dirname, "../dist"),
+    path.resolve(process.cwd(), "dist"),
+    path.resolve(process.cwd(), "../dist"),
+  ].filter((p): p is string => Boolean(p));
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(candidate, "index.html"))) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+const clientDistPath = resolveClientDistPath();
 
 const BLOCKED_SENSITIVE_PREFIXES = [
   "/.",
@@ -30,7 +44,7 @@ const BLOCKED_SENSITIVE_PREFIXES = [
 export function createApp(): Express {
   const app = express();
 
-  // 0. Trust First Proxy Hop (Local Nginx Reverse Proxy)
+  // 0. Trust First Proxy Hop (Local Nginx Reverse Proxy / Railway Edge)
   app.set("trust proxy", 1);
 
   // 1. Security Headers via Helmet
@@ -74,19 +88,41 @@ export function createApp(): Express {
   app.use(config.API_PREFIX, apiRouter);
 
   // 6. Serve Compiled Frontend SPA (if dist exists)
-  if (fs.existsSync(clientDistPath)) {
+  if (clientDistPath) {
+    const assetsPath = path.join(clientDistPath, "assets");
+    if (fs.existsSync(assetsPath)) {
+      app.use(
+        "/assets",
+        express.static(assetsPath, {
+          dotfiles: "ignore",
+          maxAge: config.NODE_ENV === "production" ? "1y" : 0,
+          immutable: config.NODE_ENV === "production",
+        })
+      );
+      // Explicitly catch missing /assets/* requests and return 404 text/plain
+      app.use("/assets", (_req, res) => {
+        res.status(404).type("text/plain").send("Asset not found");
+      });
+    }
+
+    // Serve root-level static files (favicon.svg, manifest.webmanifest, etc.)
     app.use(
       express.static(clientDistPath, {
         index: false,
         dotfiles: "ignore",
-        maxAge: config.NODE_ENV === "production" ? "1d" : 0,
+        maxAge: config.NODE_ENV === "production" ? "1h" : 0,
       })
     );
 
-    // Single Page Application (SPA) Fallback for non-API GET routes
+    // Single Page Application (SPA) Fallback for non-API, non-asset HTML routes
     app.get("*", (req, res, next) => {
       // Never intercept API routes
       if (req.path.startsWith(config.API_PREFIX) || req.path.startsWith("/api/")) {
+        return next();
+      }
+
+      // Never intercept requests for static assets or files with extensions
+      if (req.path.startsWith("/assets/") || /\.[a-zA-Z0-9]+$/.test(req.path)) {
         return next();
       }
 
@@ -114,5 +150,6 @@ export function createApp(): Express {
 
   return app;
 }
+
 
 export const app = createApp();

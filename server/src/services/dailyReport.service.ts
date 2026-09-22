@@ -8,6 +8,8 @@ import {
   DailyReportPaginationOptions,
 } from "../repositories/dailyReport.repository.js";
 import { taskRepository } from "../repositories/task.repository.js";
+import { userRepository } from "../repositories/user.repository.js";
+import { notificationRepository } from "../repositories/notification.repository.js";
 import { auditRepository } from "../repositories/audit.repository.js";
 import { UserRoleInfo, rbacService } from "./rbac.service.js";
 import { AppError, PaginationMeta } from "../types/api.types.js";
@@ -427,6 +429,30 @@ export class DailyReportService {
       }
     }
 
+    // Notify all Admins and Super Admins if report is submitted
+    if (createdReport.status === "Submitted") {
+      try {
+        const adminIds = await userRepository.getAdminUserIds();
+        const callerProfile = await userRepository.findById(callerAuth.userId);
+        const submitterName = callerProfile?.full_name || callerAuth.userId;
+
+        for (const adminId of adminIds) {
+          if (adminId !== callerAuth.userId) {
+            await notificationRepository.createNotification({
+              user_id: adminId,
+              type: "daily_report_submitted",
+              title: "Daily Report Submitted",
+              message: `${submitterName} submitted their daily report for ${reportDate}.`,
+              reference_id: createdReport.id,
+              reference_type: "daily_report",
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("[NOTIFICATION] Could not dispatch daily_report_submitted notification to admins:", err);
+      }
+    }
+
     return this.formatReport(createdReport, createdTasks, [], null);
   }
 
@@ -498,6 +524,30 @@ export class DailyReportService {
       dailyReportRepository.getAttachments(report.id),
       dailyReportRepository.getSyncStatus(report.id),
     ]);
+
+    // If report was transitioned to Submitted, notify Admins
+    if (fieldsToUpdate.status === "Submitted" && report.status !== "Submitted") {
+      try {
+        const adminIds = await userRepository.getAdminUserIds();
+        const callerProfile = await userRepository.findById(callerAuth.userId);
+        const submitterName = callerProfile?.full_name || callerAuth.userId;
+
+        for (const adminId of adminIds) {
+          if (adminId !== callerAuth.userId) {
+            await notificationRepository.createNotification({
+              user_id: adminId,
+              type: "daily_report_submitted",
+              title: "Daily Report Submitted",
+              message: `${submitterName} submitted their daily report for ${report.report_date}.`,
+              reference_id: updated.id,
+              reference_type: "daily_report",
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("[NOTIFICATION] Could not dispatch daily report submission notification:", err);
+      }
+    }
 
     return this.formatReport(updated, tasks, attachments, sync);
   }

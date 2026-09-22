@@ -12,7 +12,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md', c
 
   const normalized = status.trim();
 
-  // Color mapping based on PostgreSQL core enums
+  // Color mapping based on system status enums
   let styleClasses = 'bg-surface-muted text-content-muted border-border';
 
   switch (normalized.toLowerCase()) {

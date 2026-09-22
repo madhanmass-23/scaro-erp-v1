@@ -1,6 +1,25 @@
 import mysql from "mysql2/promise";
 import { pool } from "../config/database.js";
 
+function isTransientConnectionError(err: any): boolean {
+  if (!err) return false;
+  const code = err.code || "";
+  const msg = err.message || "";
+  return (
+    code === "PROTOCOL_CONNECTION_LOST" ||
+    code === "ECONNRESET" ||
+    code === "PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR" ||
+    code === "ER_SOCKET_NOT_CONNECTED" ||
+    code === "EPIPE" ||
+    code === "PROTOCOL_PACKETS_OUT_OF_ORDER" ||
+    code === "ETIMEDOUT" ||
+    msg.includes("Connection lost") ||
+    msg.includes("closed the connection") ||
+    msg.includes("ETIMEDOUT") ||
+    msg.includes("socket has been closed")
+  );
+}
+
 /**
  * Executes a parameterized SELECT query returning an array of rows with transient connection retry.
  */
@@ -13,15 +32,8 @@ export async function query<T = unknown>(
       const [rows] = await pool.query<mysql.RowDataPacket[]>(sql, params as any);
       return rows as unknown as T[];
     } catch (err: any) {
-      if (
-        attempt < 3 &&
-        (err?.code === "PROTOCOL_CONNECTION_LOST" ||
-          err?.code === "ECONNRESET" ||
-          err?.code === "PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR" ||
-          err?.message?.includes("Connection lost") ||
-          err?.message?.includes("closed the connection") ||
-          err?.message?.includes("ETIMEDOUT"))
-      ) {
+      if (attempt < 3 && isTransientConnectionError(err)) {
+        console.warn(`[DATABASE] Stale/dropped connection detected (${err?.code || "LOST"}). Retrying query (attempt ${attempt}/3)...`);
         await new Promise((r) => setTimeout(r, attempt * 250));
         continue;
       }
@@ -54,15 +66,8 @@ export async function execute(
       const [result] = await pool.execute<mysql.ResultSetHeader>(sql, params as any);
       return result;
     } catch (err: any) {
-      if (
-        attempt < 3 &&
-        (err?.code === "PROTOCOL_CONNECTION_LOST" ||
-          err?.code === "ECONNRESET" ||
-          err?.code === "PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR" ||
-          err?.message?.includes("Connection lost") ||
-          err?.message?.includes("closed the connection") ||
-          err?.message?.includes("ETIMEDOUT"))
-      ) {
+      if (attempt < 3 && isTransientConnectionError(err)) {
+        console.warn(`[DATABASE] Stale/dropped connection detected (${err?.code || "LOST"}). Retrying execute (attempt ${attempt}/3)...`);
         await new Promise((r) => setTimeout(r, attempt * 250));
         continue;
       }

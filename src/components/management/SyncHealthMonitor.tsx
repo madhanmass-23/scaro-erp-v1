@@ -46,7 +46,7 @@ export const SyncHealthMonitor: React.FC<Props> = ({ onSelectReport }) => {
             Google Sheets Synchronization Health
           </CardTitle>
           <p className="text-xs text-content-muted mt-1">
-            Authoritative sync state tracking from PostgreSQL (Phase 5A pg_net pipeline).
+            Authoritative sync state tracking from MariaDB.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={loadData} className="gap-1.5 text-xs">

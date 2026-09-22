@@ -36,30 +36,36 @@ export const NotificationsPage: React.FC = () => {
   const [error, setError] = useState<Error | null>(null);
   const [activeCategory, setActiveCategory] = useState<NotificationCategory>('all');
 
-  const loadNotifications = async () => {
+  const loadNotifications = async (isBackground = false) => {
     if (!user) return;
     try {
-      setLoading(true);
-      setError(null);
+      if (!isBackground) {
+        setLoading(true);
+        setError(null);
+      }
       const data = await fetchUserNotifications(user.id, 100);
       setNotifications(data);
     } catch (err: any) {
-      setError(err);
+      if (!isBackground) {
+        setError(err);
+      }
     } finally {
-      setLoading(false);
+      if (!isBackground) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     if (!user) return;
 
-    loadNotifications();
+    loadNotifications(false);
     triggerDailyReportReminder();
 
-    // Polling interval for notifications refresh
+    // Polling interval for background notifications refresh (30s)
     const interval = setInterval(() => {
-      loadNotifications();
-    }, 15000);
+      loadNotifications(true);
+    }, 30000);
 
     return () => {
       clearInterval(interval);
@@ -232,7 +238,7 @@ export const NotificationsPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <Button variant="outline" size="sm" onClick={loadNotifications} className="gap-1.5 text-xs">
+          <Button variant="outline" size="sm" onClick={() => loadNotifications(false)} className="gap-1.5 text-xs">
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
           </Button>
           {unreadCount > 0 && (

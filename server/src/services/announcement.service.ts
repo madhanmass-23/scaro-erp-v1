@@ -6,6 +6,7 @@ import {
   UserAudienceScope,
 } from "../repositories/announcement.repository.js";
 import { userRepository } from "../repositories/user.repository.js";
+import { notificationRepository } from "../repositories/notification.repository.js";
 import { auditRepository } from "../repositories/audit.repository.js";
 import { authorizationService } from "./authorization.service.js";
 import { UserRoleInfo } from "./rbac.service.js";
@@ -206,6 +207,29 @@ export class AnnouncementService {
         department_id: created.department_id,
       },
     });
+
+    // Notify audience members
+    try {
+      const targetUserIds = await userRepository.getUserIdsByAudience(
+        created.audience,
+        created.department_id
+      );
+
+      for (const targetId of targetUserIds) {
+        if (targetId !== callerAuth.userId) {
+          await notificationRepository.createNotification({
+            user_id: targetId,
+            type: "announcement",
+            title: `Announcement: ${created.title}`,
+            message: created.content.length > 120 ? `${created.content.substring(0, 117)}...` : created.content,
+            reference_id: created.id,
+            reference_type: "announcement",
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("[NOTIFICATION] Could not dispatch announcement notifications:", err);
+    }
 
     return this.formatAnnouncement(created);
   }

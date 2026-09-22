@@ -1,27 +1,32 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { MobileBottomNav } from '../components/ui/MobileBottomNav';
+import { AutoInstallPrompt } from '../components/pwa/AutoInstallPrompt';
 
 export const AppLayout: React.FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
   return (
     <div className="flex h-screen bg-surface-muted overflow-hidden">
-      <Sidebar isMobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
+      {/* Persistent Desktop Sidebar (hidden on <1024px) */}
+      <Sidebar />
       
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header onMobileMenuClick={() => setSidebarOpen(true)} />
+      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
+        {/* Top Header */}
+        <Header />
         
-        <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 pb-20 md:pb-8">
+        {/* Content View Area */}
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 pb-20 lg:pb-8">
           <div className="mx-auto max-w-7xl">
             <Outlet />
           </div>
         </main>
 
-        {/* Mobile Bottom Navigation (<768px) */}
+        {/* Mobile & Tablet Bottom Navigation (<1024px) */}
         <MobileBottomNav />
+
+        {/* Automatic Post-Login PWA Install Prompt */}
+        <AutoInstallPrompt />
       </div>
     </div>
   );

@@ -637,7 +637,7 @@ export const TasksPage: React.FC = () => {
                   <h2 className="text-xl font-bold text-content">{selectedTask.title}</h2>
                 </div>
 
-                {/* Status Dropdown using ACTUAL PostgreSQL Enum values */}
+                {/* Status Dropdown using task status enum values */}
                 <div className="shrink-0">
                   <label className="block text-[11px] font-medium text-content-muted mb-0.5">Status</label>
                   <select 

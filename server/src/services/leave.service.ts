@@ -5,6 +5,8 @@ import {
   LeavePaginationOptions,
 } from "../repositories/leave.repository.js";
 import { auditRepository } from "../repositories/audit.repository.js";
+import { userRepository } from "../repositories/user.repository.js";
+import { notificationRepository } from "../repositories/notification.repository.js";
 import { authorizationService } from "./authorization.service.js";
 import { UserRoleInfo, rbacService } from "./rbac.service.js";
 import { AppError } from "../types/api.types.js";
@@ -201,6 +203,28 @@ export class LeaveService {
       },
     });
 
+    // 4. Notify all Admins / Super Admins
+    try {
+      const adminIds = await userRepository.getAdminUserIds();
+      const callerProfile = await userRepository.findById(callerAuth.userId);
+      const requesterName = callerProfile?.full_name || callerAuth.userId;
+
+      for (const adminId of adminIds) {
+        if (adminId !== callerAuth.userId) {
+          await notificationRepository.createNotification({
+            user_id: adminId,
+            type: "leave_submitted",
+            title: "New Leave Request",
+            message: `${requesterName} submitted a ${payload.type} request (${startDateClean} to ${endDateClean}).`,
+            reference_id: created.id,
+            reference_type: "leave",
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("[NOTIFICATION] Could not dispatch leave_submitted notifications to admins:", err);
+    }
+
     return this.formatLeaveRequest(created);
   }
 
@@ -354,6 +378,22 @@ export class LeaveService {
       },
       new_value: fieldsToUpdate,
     });
+
+    // Notify employee when leave status is reviewed (Approved / Rejected)
+    if (fieldsToUpdate.status && fieldsToUpdate.status !== leave.status && leave.user_id !== callerAuth.userId) {
+      try {
+        await notificationRepository.createNotification({
+          user_id: leave.user_id,
+          type: `leave_${fieldsToUpdate.status.toLowerCase()}`,
+          title: `Leave Request ${fieldsToUpdate.status}`,
+          message: `Your ${leave.type} request (${String(leave.start_date).split("T")[0]} to ${String(leave.end_date).split("T")[0]}) was ${fieldsToUpdate.status.toLowerCase()}.${fieldsToUpdate.rejection_reason ? ` Reason: ${fieldsToUpdate.rejection_reason}` : ""}`,
+          reference_id: updated.id,
+          reference_type: "leave",
+        });
+      } catch (err) {
+        console.warn("[NOTIFICATION] Could not dispatch leave status notification to requester:", err);
+      }
+    }
 
     return this.formatLeaveRequest(updated);
   }

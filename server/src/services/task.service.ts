@@ -9,6 +9,7 @@ import {
 } from "../repositories/task.repository.js";
 import { projectRepository } from "../repositories/project.repository.js";
 import { userRepository } from "../repositories/user.repository.js";
+import { notificationRepository } from "../repositories/notification.repository.js";
 import { auditRepository } from "../repositories/audit.repository.js";
 import { UserRoleInfo, rbacService } from "./rbac.service.js";
 import { AppError } from "../types/api.types.js";
@@ -287,6 +288,22 @@ export class TaskService {
       due_date: due_date ? String(due_date).trim() : null,
     });
 
+    // Notify assignee if different from creator
+    if (created.assignee_id && created.assignee_id !== callerAuth.userId) {
+      try {
+        await notificationRepository.createNotification({
+          user_id: created.assignee_id,
+          type: "task_assigned",
+          title: "New Task Assigned",
+          message: `You have been assigned task "${created.title}" in ${project.name}.`,
+          reference_id: created.id,
+          reference_type: "task",
+        });
+      } catch (err) {
+        console.warn("[NOTIFICATION] Could not dispatch task_assigned notification:", err);
+      }
+    }
+
     return this.formatTask(created);
   }
 
@@ -436,6 +453,56 @@ export class TaskService {
     const updated = await taskRepository.update(taskId, fieldsToUpdate);
     if (!updated) {
       throw new AppError("Task not found", 404, "TASK_NOT_FOUND");
+    }
+
+    // 1. Notify new assignee if reassigned
+    if (fieldsToUpdate.assignee_id && fieldsToUpdate.assignee_id !== task.assignee_id && fieldsToUpdate.assignee_id !== callerAuth.userId) {
+      try {
+        await notificationRepository.createNotification({
+          user_id: fieldsToUpdate.assignee_id,
+          type: "task_assigned",
+          title: "Task Reassigned",
+          message: `You have been assigned task "${updated.title}".`,
+          reference_id: updated.id,
+          reference_type: "task",
+        });
+      } catch (err) {
+        console.warn("[NOTIFICATION] Could not dispatch task_assigned notification:", err);
+      }
+    }
+
+    // 2. Notify on status transition (e.g. Review, Completed, or status change)
+    if (fieldsToUpdate.status && fieldsToUpdate.status !== task.status) {
+      try {
+        const recipients = new Set<string>();
+        if (task.reporter_id && task.reporter_id !== callerAuth.userId) {
+          recipients.add(task.reporter_id);
+        }
+        if (task.assignee_id && task.assignee_id !== callerAuth.userId) {
+          recipients.add(task.assignee_id);
+        }
+
+        // If completed or submitted for review, also notify Admins
+        if (fieldsToUpdate.status === "Review" || fieldsToUpdate.status === "Completed") {
+          const adminIds = await userRepository.getAdminUserIds();
+          for (const aId of adminIds) {
+            if (aId !== callerAuth.userId) recipients.add(aId);
+          }
+        }
+
+        for (const recipientId of recipients) {
+          await notificationRepository.createNotification({
+            user_id: recipientId,
+            type: "task_status_changed",
+            title: `Task ${fieldsToUpdate.status}`,
+            message: `Task "${updated.title}" status changed to ${fieldsToUpdate.status}.`,
+            reference_id: updated.id,
+            reference_type: "task",
+          });
+        }
+      } catch (err) {
+        console.warn("[NOTIFICATION] Could not dispatch task status notifications:", err);
+      }
     }
 
     return this.formatTask(updated);

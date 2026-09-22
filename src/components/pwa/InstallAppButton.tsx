@@ -1,72 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Smartphone, Monitor, Apple, Check, Info } from 'lucide-react';
+import { usePwaInstall } from './usePwaInstall';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
-
 export const InstallAppButton: React.FC<{ className?: string }> = ({ className = '' }) => {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isInstalled, setIsInstalled] = useState<boolean>(false);
+  const { isInstalled, deferredPrompt, promptInstall } = usePwaInstall();
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'ios' | 'android' | 'desktop'>('android');
 
   useEffect(() => {
-    // 1. Check if already installed / running in standalone mode
-    const checkInstalled = () => {
-      const isStandalone = 
-        window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone === true ||
-        document.referrer.includes('android-app://');
-      setIsInstalled(Boolean(isStandalone));
-    };
-
-    checkInstalled();
-
-    // 2. Detect platform for default instructions tab
-    const userAgent = window.navigator.userAgent.toLowerCase();
-    if (/iphone|ipad|ipod/.test(userAgent)) {
-      setActiveTab('ios');
-    } else if (/android/.test(userAgent)) {
-      setActiveTab('android');
-    } else {
-      setActiveTab('desktop');
+    // Detect platform for default instructions tab
+    if (typeof window !== 'undefined') {
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      if (/iphone|ipad|ipod/.test(userAgent)) {
+        setActiveTab('ios');
+      } else if (/android/.test(userAgent)) {
+        setActiveTab('android');
+      } else {
+        setActiveTab('desktop');
+      }
     }
-
-    // 3. Listen for browser install prompt
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-    };
-
-    const handleAppInstalled = () => {
-      setIsInstalled(true);
-      setDeferredPrompt(null);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
   }, []);
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
-      try {
-        await deferredPrompt.prompt();
-        const choice = await deferredPrompt.userChoice;
-        if (choice.outcome === 'accepted') {
-          setIsInstalled(true);
-          setDeferredPrompt(null);
-        }
-      } catch (err) {
-        console.error('PWA install prompt error:', err);
+      const success = await promptInstall();
+      if (!success) {
         setIsModalOpen(true);
       }
     } else {

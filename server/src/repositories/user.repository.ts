@@ -222,6 +222,64 @@ export class UserRepository {
     );
     return !!row;
   }
+
+  /**
+   * Retrieves user IDs of all active Admin and Super Admin users.
+   */
+  async getAdminUserIds(): Promise<string[]> {
+    const sql = `
+      SELECT DISTINCT p.id AS user_id
+      FROM profiles p
+      JOIN user_roles ur ON p.id = ur.user_id
+      JOIN roles r ON ur.role_id = r.id
+      WHERE r.name IN ('Admin', 'Super Admin') AND p.is_active = 1
+    `;
+    const rows = await query<{ user_id: string }>(sql);
+    return rows.map((r) => r.user_id);
+  }
+
+  /**
+   * Retrieves active user IDs by audience target or department.
+   */
+  async getUserIdsByAudience(
+    audience: "Everyone" | "Employees" | "Interns" | "Department",
+    departmentId?: string | null
+  ): Promise<string[]> {
+    if (audience === "Department" && departmentId) {
+      const sql = "SELECT id AS user_id FROM profiles WHERE department_id = ? AND is_active = 1";
+      const rows = await query<{ user_id: string }>(sql, [departmentId]);
+      return rows.map((r) => r.user_id);
+    }
+
+    if (audience === "Employees") {
+      const sql = `
+        SELECT DISTINCT p.id AS user_id
+        FROM profiles p
+        JOIN user_roles ur ON p.id = ur.user_id
+        JOIN roles r ON ur.role_id = r.id
+        WHERE r.name IN ('Employee', 'Admin', 'Super Admin') AND p.is_active = 1
+      `;
+      const rows = await query<{ user_id: string }>(sql);
+      return rows.map((r) => r.user_id);
+    }
+
+    if (audience === "Interns") {
+      const sql = `
+        SELECT DISTINCT p.id AS user_id
+        FROM profiles p
+        JOIN user_roles ur ON p.id = ur.user_id
+        JOIN roles r ON ur.role_id = r.id
+        WHERE r.name IN ('Intern', 'Admin', 'Super Admin') AND p.is_active = 1
+      `;
+      const rows = await query<{ user_id: string }>(sql);
+      return rows.map((r) => r.user_id);
+    }
+
+    // Default "Everyone"
+    const sql = "SELECT id AS user_id FROM profiles WHERE is_active = 1";
+    const rows = await query<{ user_id: string }>(sql);
+    return rows.map((r) => r.user_id);
+  }
 }
 
 export const userRepository = new UserRepository();
