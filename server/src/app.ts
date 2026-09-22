@@ -41,6 +41,62 @@ const BLOCKED_SENSITIVE_PREFIXES = [
   "/tsconfig.json",
 ];
 
+function isOriginAllowed(origin: string | undefined, hostHeader: string | undefined): boolean {
+  // Allow requests with no origin (e.g. mobile apps, curl, server-to-server, standard browser navigation)
+  if (!origin) return true;
+
+  try {
+    const parsedOrigin = new URL(origin);
+
+    // 1. Configured CORS_ORIGIN values (comma-separated, trimmed)
+    const configuredOrigins = config.CORS_ORIGIN
+      ? config.CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean)
+      : [];
+    if (configuredOrigins.includes(origin)) {
+      return true;
+    }
+
+    // 2. Same-origin matching incoming request Host header
+    if (hostHeader) {
+      const hostWithoutPort = hostHeader.split(":")[0].toLowerCase();
+      const originHost = parsedOrigin.hostname.toLowerCase();
+      if (originHost === hostWithoutPort) {
+        return true;
+      }
+    }
+
+    // 3. Railway deployment domains (*.up.railway.app, *.railway.app)
+    if (parsedOrigin.protocol === "https:") {
+      const hostname = parsedOrigin.hostname.toLowerCase();
+      if (
+        hostname.endsWith(".up.railway.app") ||
+        hostname.endsWith(".railway.app") ||
+        hostname === "up.railway.app" ||
+        hostname === "railway.app"
+      ) {
+        return true;
+      }
+    }
+
+    // 4. Localhost and loopback origins (for development and test)
+    if (config.NODE_ENV !== "production") {
+      const hostname = parsedOrigin.hostname.toLowerCase();
+      if (
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "::1" ||
+        hostname === "[::1]"
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function createApp(): Express {
   const app = express();
 
@@ -56,23 +112,18 @@ export function createApp(): Express {
   );
 
   // 2. Cross-Origin Resource Sharing (CORS)
-  const allowedOrigins = config.CORS_ORIGIN
-    ? config.CORS_ORIGIN.split(",").map((o) => o.trim())
-    : [];
-
   app.use(
-    cors({
-      origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps, curl, server-to-server)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.length === 0 || allowedOrigins.includes(origin) || config.NODE_ENV === "development") {
-          return callback(null, true);
-        }
-        return callback(new Error("CORS policy does not allow access from this origin."));
-      },
-      credentials: true,
-      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+    cors((req, callback) => {
+      const origin = req.headers.origin;
+      const host = req.headers.host;
+      const allowed = isOriginAllowed(origin, host);
+
+      callback(null, {
+        origin: allowed,
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+      });
     })
   );
 

@@ -58,6 +58,12 @@ export function errorHandler(
     return;
   }
 
+  // Handle CORS policy rejection errors
+  if (err instanceof Error && err.message && err.message.includes("CORS")) {
+    sendError(res, "CORS_FORBIDDEN", err.message, 403);
+    return;
+  }
+
   // Handle file system ENOENT or 404 status errors
   if (err && typeof err === "object" && ("code" in err || "status" in err)) {
     const errorObj = err as any;
